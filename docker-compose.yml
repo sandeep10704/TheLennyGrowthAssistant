@@ -40,7 +40,7 @@ services:
   # 2. Chroma Vector Database (Persistent Knowledge Store)
   # ----------------------------------------------------------------------------
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.6.3
     container_name: lenny-chromadb
     restart: unless-stopped
     environment:
@@ -68,8 +68,8 @@ services:
       - .env
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
-      # If DATABASE_URL is set in .env (e.g. Supabase), it is used; otherwise defaults to local postgres container
-      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/lenny_growth}
+      # If DOCKER_DATABASE_URL is set (e.g. Supabase pooler), it is used; otherwise defaults to the local postgres container
+      - DATABASE_URL=${DOCKER_DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-lenny_growth}}
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
       - CHROMA_COLLECTION_NAME=${CHROMA_COLLECTION_NAME:-lenny_growth_knowledge}
@@ -77,9 +77,10 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
+      - OLLAMA_BASE_URL=${DOCKER_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
       - OLLAMA_EMBEDDING_MODEL=${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+      - OLLAMA_TIMEOUT_SECONDS=${OLLAMA_TIMEOUT_SECONDS:-120.0}
       - ALLOWED_CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
     depends_on:
       postgres:

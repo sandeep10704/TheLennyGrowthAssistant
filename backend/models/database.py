@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import (
     AsyncEngine,
 )
 from config.settings import settings, logger
-from services.db_retry import execute_with_db_retry
 
 
 class Base(DeclarativeBase):
@@ -128,6 +127,8 @@ def get_connection_pool_stats() -> Dict[str, Any]:
 
 async def init_db() -> None:
     """Initialize relational database tables on startup using retry logic."""
+    from services.db_retry import execute_with_db_retry
+
     async def _init():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

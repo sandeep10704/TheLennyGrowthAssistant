@@ -86,14 +86,16 @@ class OpenAIProvider(BaseLLMProvider):
         target_model = model or self.default_model
         try:
             # Wrap with explicit asyncio timeout handling
-            async with asyncio.timeout(timeout):
-                response = await self.client.chat.completions.create(
+            response = await asyncio.wait_for(
+                self.client.chat.completions.create(
                     model=target_model,
                     messages=messages,  # type: ignore
                     temperature=temperature,
                     max_tokens=max_tokens,
-                )
-                return response.choices[0].message.content or ""
+                ),
+                timeout=timeout,
+            )
+            return response.choices[0].message.content or ""
 
         except asyncio.TimeoutError:
             logger.error(f"[OpenAIProvider] Generation timed out after {timeout}s.")
@@ -145,17 +147,19 @@ class OllamaProvider(BaseLLMProvider):
         }
 
         try:
-            async with asyncio.timeout(timeout):
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    res = await client.post(f"{self.base_url}/api/chat", json=payload)
-                    if res.status_code == 200:
-                        data = res.json()
-                        return data.get("message", {}).get("content", "")
-                    else:
-                        raise LLMServiceError(
-                            provider="ollama",
-                            reason=f"HTTP {res.status_code}: {res.text}",
-                        )
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                res = await asyncio.wait_for(
+                    client.post(f"{self.base_url}/api/chat", json=payload),
+                    timeout=timeout,
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    return data.get("message", {}).get("content", "")
+                else:
+                    raise LLMServiceError(
+                        provider="ollama",
+                        reason=f"HTTP {res.status_code}: {res.text}",
+                    )
 
         except (asyncio.TimeoutError, httpx.TimeoutException):
             logger.error(f"[OllamaProvider] Local request timed out after {timeout}s.")
