@@ -24,6 +24,11 @@ from services.essay_generator import (
     Ship30EssayGenerator,
     generate_ship30_article,
 )
+from services.artifact_generator import (
+    ArtifactGenerator,
+    get_artifact_generator,
+    generate_artifact,
+)
 
 __all__ = [
     "AppException",
@@ -51,4 +56,7 @@ __all__ = [
     "Ship30Article",
     "Ship30EssayGenerator",
     "generate_ship30_article",
+    "ArtifactGenerator",
+    "get_artifact_generator",
+    "generate_artifact",
 ]

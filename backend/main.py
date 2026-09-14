@@ -150,6 +150,8 @@ async def root():
         "docs": "/docs",
         "health": "/health",
         "chat": "/chat",
+        "router": "/router",
+        "artifacts": "/artifacts/generate",
     }
 
 

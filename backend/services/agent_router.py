@@ -14,6 +14,7 @@ from services.vector_service import VectorService, get_vector_service
 from services.session_service import SessionService, get_session_service
 from services.llm_service import LLMService, get_llm_service
 from services.essay_generator import generate_ship30_article, Ship30Article
+from services.artifact_generator import generate_artifact, ArtifactResponse
 
 IntentType = Literal["answer", "essay", "artifact"]
 
@@ -223,67 +224,45 @@ class AgentRouter:
         model: Optional[str] = None,
         temperature: float = 0.6,
     ) -> ArtifactData:
-        # Extract page spec description
+        # Extract spec description
         spec = re.sub(
-            r"^(?:please\s+)?(?:create|build|generate|design|make)\s+(?:an?\s+)?(?:page|webpage|landing\s+page|ui|dashboard|calculator)\s+(?:for|about)?\s*",
+            r"^(?:please\s+)?(?:create|build|generate|design|make)\s+(?:an?\s+)?(?:page|webpage|landing\s+page|ui|dashboard|calculator|spec|checklist)\s+(?:for|about)?\s*",
             "",
             prompt,
             flags=re.IGNORECASE,
         ).strip() or prompt
 
-        artifact_system_prompt = f"""You are a world-class Frontend Engineer and UI/UX Designer.
-Create a complete, fully functional, beautifully styled web page artifact for: '{spec}'.
-
-REQUIREMENTS:
-1. Return a single, self-contained, valid HTML5 file.
-2. Use Tailwind CSS via CDN: <script src="https://cdn.tailwindcss.com"></script>
-3. Include modern, beautiful typography, gradients, responsive layout, clear CTA buttons, and interactive JavaScript features (e.g. interactive forms, calculators, tab switchers, or metric counters).
-4. Code must be production-ready and render standalone inside an iframe or browser.
-5. Return ONLY the HTML code enclosed in ```html ... ``` codeblock.
-
-PAGE TOPIC: {spec}
-"""
-
-        generated_raw = await self.llm_service.generate_response(
-            query=f"Generate the complete HTML page code for: {spec}",
-            context="Create modern product landing page with hero, features, testimonials, interactive demo, and footer.",
+        # Generate artifact using ArtifactGenerator (auto-detects HTML vs Markdown)
+        artifact_res: ArtifactResponse = await generate_artifact(
+            prompt=prompt,
+            output_type=None,
             provider=provider,
             model=model,
-            temperature=temperature,
-            system_template=artifact_system_prompt,
         )
 
-        # Extract code from codeblock
-        code_match = re.search(r"```(?:html)?\s*(<!DOCTYPE html[\s\S]+?|<html>[\s\S]+?)```", generated_raw, re.IGNORECASE)
-        if code_match:
-            clean_code = code_match.group(1).strip()
-        elif "<!DOCTYPE html" in generated_raw or "<html" in generated_raw:
-            clean_code = generated_raw.strip()
+        if artifact_res.type == "html":
+            title = f"{spec.title()} Page"
+            title_extract = re.search(r"<title>(.*?)</title>", artifact_res.content, re.IGNORECASE)
+            if title_extract:
+                title = title_extract.group(1).strip()
+            artifact_type = "landing_page"
+            description = f"Interactive responsive web page generated for '{spec}' with Tailwind CSS."
+            metadata = {"framework": "HTML5 + Tailwind CSS", "type": "html", "interactive": True}
         else:
-            clean_code = (
-                "<!DOCTYPE html>\n"
-                "<html lang='en'>\n"
-                "<head><meta charset='UTF-8'><script src='https://cdn.tailwindcss.com'></script></head>\n"
-                "<body class='bg-slate-50 min-h-screen p-8'>\n"
-                f"<div class='max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200'>\n"
-                f"<h1 class='text-2xl font-bold text-slate-900'>{spec.title()}</h1>\n"
-                f"<div class='mt-4 prose text-slate-600'>{generated_raw}</div>\n"
-                "</div>\n"
-                "</body>\n"
-                "</html>"
-            )
-
-        title = f"{spec.title()} Page"
-        title_extract = re.search(r"<title>(.*?)</title>", clean_code, re.IGNORECASE)
-        if title_extract:
-            title = title_extract.group(1).strip()
+            title = f"{spec.title()} Specification"
+            title_extract = re.search(r"^#\s+(.+)$", artifact_res.content, re.MULTILINE)
+            if title_extract:
+                title = title_extract.group(1).strip()
+            artifact_type = "markdown_spec"
+            description = f"Structured Markdown specification/checklist generated for '{spec}'."
+            metadata = {"framework": "GitHub Flavored Markdown", "type": "markdown", "interactive": False}
 
         return ArtifactData(
             title=title,
-            artifact_type="landing_page",
-            description=f"Interactive responsive web page generated for '{spec}' with Tailwind CSS.",
-            code=clean_code,
-            metadata={"framework": "HTML5 + Tailwind CSS", "interactive": True},
+            artifact_type=artifact_type,
+            description=description,
+            code=artifact_res.content,
+            metadata=metadata,
             provider=provider or "openai",
             model=model or "gpt-4o",
         )

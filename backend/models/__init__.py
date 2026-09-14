@@ -10,6 +10,8 @@ from models.schemas import (
     AnswerData,
     EssayData,
     ArtifactData,
+    ArtifactResponse,
+    ArtifactRequest,
     AgentRouterRequest,
     AgentRouterResponse,
 )
@@ -35,6 +37,8 @@ __all__ = [
     "AnswerData",
     "EssayData",
     "ArtifactData",
+    "ArtifactResponse",
+    "ArtifactRequest",
     "AgentRouterRequest",
     "AgentRouterResponse",
     "Base",

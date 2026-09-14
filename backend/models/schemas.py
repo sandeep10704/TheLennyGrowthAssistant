@@ -141,6 +141,29 @@ class ArtifactData(BaseModel):
     model: str
 
 
+class ArtifactResponse(BaseModel):
+    """
+    Artifact Generator Output Schema:
+    {
+      "type": "html" | "markdown",
+      "content": "..."
+    }
+    """
+    type: Literal["html", "markdown"]
+    content: str
+
+
+class ArtifactRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, description="Prompt describing the artifact to generate")
+    output_type: Optional[Literal["html", "markdown"]] = Field(
+        default=None,
+        description="Optional output format override ('html' or 'markdown'). Auto-detected if omitted."
+    )
+    context: Optional[str] = Field(default=None, description="Optional background context or requirements")
+    provider: Optional[str] = None
+    model: Optional[str] = None
+
+
 class AgentRouterRequest(BaseModel):
     """Request payload for the agent intent router."""
     prompt: str = Field(
