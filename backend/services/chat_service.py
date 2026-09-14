@@ -55,7 +55,7 @@ class ChatService:
         # 3. Retrieve relevant knowledge chunks from vector store
         sources: List[SourceCitation] = self.vector_service.query_knowledge(
             query=request.message,
-            top_k=request.top_k_sources or 4,
+            top_k=request.top_k_sources or 5,
         )
 
         # 4. Format context block

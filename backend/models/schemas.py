@@ -43,10 +43,10 @@ class ChatRequest(BaseModel):
         description="Sampling temperature for creativity vs precision."
     )
     top_k_sources: Optional[int] = Field(
-        default=4,
+        default=5,
         ge=1,
         le=10,
-        description="Number of relevant knowledge chunks to retrieve from vector store."
+        description="Number of relevant knowledge chunks to retrieve from vector store (default: 5)."
     )
 
 
