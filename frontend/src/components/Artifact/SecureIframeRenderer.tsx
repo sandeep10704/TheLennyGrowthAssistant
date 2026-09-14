@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Shield, RefreshCw, Maximize2, Minimize2, AlertTriangle } from 'lucide-react';
 import { buildSandboxedSrcDoc, SANDBOX_ATTRIBUTE_VALUE } from '../../utils/sanitizer';
 

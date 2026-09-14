@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FileText, Copy, Check, Info, BookOpen } from 'lucide-react';
+import { FileText, Copy, Check, BookOpen } from 'lucide-react';
 import { parseMarkdownToHtml } from '../../utils/markdown';
 import { sanitizeHtml } from '../../utils/sanitizer';
 

@@ -7,14 +7,13 @@ import {
   Check,
   Copy,
   Info,
-  Layers,
   Sparkles,
   FileText,
 } from 'lucide-react';
 import { SecureRenderingMode } from '../../types';
 import { SecureIframeRenderer } from './SecureIframeRenderer';
 import { SanitizedHtmlRenderer } from './SanitizedHtmlRenderer';
-import { getSecurityPolicyExplanation, ALLOWED_TAGS, BLOCKED_ELEMENTS } from '../../utils/sanitizer';
+import { getSecurityPolicyExplanation, ALLOWED_TAGS } from '../../utils/sanitizer';
 
 interface SecureArtifactViewerProps {
   content: string;

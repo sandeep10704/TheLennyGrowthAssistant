@@ -7,7 +7,6 @@ import {
   PanelRightOpen,
   PanelRightClose,
   Menu,
-  ShieldCheck,
 } from 'lucide-react';
 import { HealthStatus } from '../../types';
 import { StatusBadge } from '../common/StatusBadge';

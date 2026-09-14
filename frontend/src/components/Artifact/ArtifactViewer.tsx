@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Sparkles,
   FileCode,
   FileText,
   Copy,
@@ -10,7 +9,6 @@ import {
   X,
   Code,
   Eye,
-  Shield,
   Layers,
 } from 'lucide-react';
 import { Artifact } from '../../types';
@@ -65,7 +63,6 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({
   };
 
   const isHtml = artifact.type === 'html';
-  const isMarkdown = artifact.type === 'markdown';
 
   return (
     <div className="flex flex-col h-full bg-slate-50 border-l border-slate-200 overflow-hidden select-none">

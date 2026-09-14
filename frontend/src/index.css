@@ -88,7 +88,7 @@
 
 /* Tables */
 .markdown-body .table-container {
-  @apply my-5 overflow-x-auto rounded-xl border border-slate-200 shadow-2xs;
+  @apply my-5 overflow-x-auto rounded-xl border border-slate-200 shadow-sm;
 }
 
 .markdown-body .markdown-table {

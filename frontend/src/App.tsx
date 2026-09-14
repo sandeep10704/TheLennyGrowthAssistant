@@ -7,8 +7,7 @@ import { ModelSelector } from './components/Chat/ModelSelector';
 import { ArtifactViewer } from './components/Artifact';
 import { useHealth } from './hooks/useHealth';
 import { useChat } from './hooks/useChat';
-import { api } from './services/api';
-import { Artifact, ArtifactType } from './types';
+import { Artifact } from './types';
 import { AlertCircle } from 'lucide-react';
 
 export const App: React.FC = () => {
