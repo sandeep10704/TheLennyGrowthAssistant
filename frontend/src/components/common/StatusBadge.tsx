@@ -1,13 +1,14 @@
 import React from 'react';
 
 interface StatusBadgeProps {
-  status: 'healthy' | 'degraded' | 'unavailable' | string;
+  status?: 'healthy' | 'degraded' | 'unavailable' | 'ready' | string | null;
   label?: string;
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
-  const isHealthy = status === 'healthy' || status === 'ready';
-  const isDegraded = status === 'degraded' || status === 'unconfigured_api_key';
+  const safeStatus = (status || 'unavailable').toLowerCase();
+  const isHealthy = safeStatus === 'healthy' || safeStatus === 'ready';
+  const isDegraded = safeStatus === 'degraded' || safeStatus === 'unconfigured_api_key';
 
   return (
     <div className="flex items-center space-x-1.5 text-xs font-medium px-2 py-0.5 rounded-full border">
@@ -22,7 +23,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label }) => {
       />
       <span className="capitalize text-slate-700">
         {label ? `${label}: ` : ''}
-        {status}
+        {status || 'Unavailable'}
       </span>
     </div>
   );

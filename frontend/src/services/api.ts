@@ -25,8 +25,42 @@ async function handleResponse<T>(response: Response): Promise<T> {
 export const api = {
   // System Health
   async getHealth(): Promise<HealthStatus> {
-    const res = await fetch(`${BASE_URL}/health`);
-    return handleResponse<HealthStatus>(res);
+    try {
+      const res = await fetch(`${BASE_URL}/health`);
+      const data = await handleResponse<any>(res);
+      const dbStatus = data?.components?.database || data?.database || { status: 'unavailable' };
+      const vectorStatus = data?.components?.vector_store || data?.vector_store || { status: 'unavailable' };
+      const llmStatus = data?.components?.llm || data?.llm || { status: 'unavailable' };
+
+      return {
+        status: data?.status || 'unavailable',
+        version: data?.version || '1.0.0',
+        environment: data?.environment || 'development',
+        timestamp: data?.timestamp,
+        components: data?.components || {
+          database: dbStatus,
+          vector_store: vectorStatus,
+          llm: llmStatus,
+        },
+        database: dbStatus,
+        vector_store: vectorStatus,
+        llm: llmStatus,
+      };
+    } catch (err) {
+      return {
+        status: 'degraded',
+        version: '1.0.0',
+        environment: 'offline',
+        database: { status: 'unavailable' },
+        vector_store: { status: 'unavailable' },
+        llm: { status: 'unavailable' },
+        components: {
+          database: { status: 'unavailable' },
+          vector_store: { status: 'unavailable' },
+          llm: { status: 'unavailable' },
+        },
+      };
+    }
   },
 
   // Chat Endpoint
@@ -45,46 +79,53 @@ export const api = {
     });
     const data = await handleResponse<any>(res);
     return {
-      id: data.message_id || `msg-${Date.now()}`,
-      conversation_id: data.session_id,
+      id: data?.message_id || `msg-${Date.now()}`,
+      conversation_id: data?.session_id || payload.conversation_id,
       role: 'assistant',
-      content: data.content,
-      sources: data.sources || [],
-      model_used: `${data.provider}:${data.model}`,
-      created_at: data.created_at || new Date().toISOString(),
+      content: data?.content || '',
+      sources: Array.isArray(data?.sources) ? data.sources : [],
+      model_used: data?.provider && data?.model ? `${data.provider}:${data.model}` : 'lenny-ai',
+      created_at: data?.created_at || new Date().toISOString(),
     };
   },
 
   // Sessions / Conversations
   async getConversations(): Promise<Conversation[]> {
-    const res = await fetch(`${BASE_URL}/chat/sessions`);
-    const data = await handleResponse<any[]>(res);
-    return data.map((item) => ({
-      id: item.session_id || item.id,
-      title: item.title || 'Growth Advisory Session',
-      created_at: item.created_at,
-      updated_at: item.updated_at || item.created_at,
-    }));
+    try {
+      const res = await fetch(`${BASE_URL}/chat/sessions`);
+      const data = await handleResponse<any>(res);
+      const list = Array.isArray(data) ? data : (data?.sessions || []);
+      return list.map((item: any) => ({
+        id: item?.session_id || item?.id || `session-${Date.now()}`,
+        title: item?.title || 'Growth Advisory Session',
+        created_at: item?.created_at || new Date().toISOString(),
+        updated_at: item?.updated_at || item?.created_at || new Date().toISOString(),
+      }));
+    } catch (err) {
+      console.warn('Failed to load conversations from backend:', err);
+      return [];
+    }
   },
 
   async getConversation(id: string): Promise<Conversation & { messages: Message[] }> {
     const res = await fetch(`${BASE_URL}/chat/sessions/${id}`);
     const data = await handleResponse<any>(res);
-    const messages: Message[] = (data.messages || []).map((m: any) => ({
-      id: m.id || `msg-${Date.now()}`,
-      conversation_id: data.session_id || id,
-      role: m.role,
-      content: m.content,
-      sources: m.sources || [],
-      model_used: m.model_used,
-      created_at: m.created_at || new Date().toISOString(),
+    const rawMessages = Array.isArray(data?.messages) ? data.messages : [];
+    const messages: Message[] = rawMessages.map((m: any) => ({
+      id: m?.id || `msg-${Date.now()}`,
+      conversation_id: data?.session_id || id,
+      role: m?.role || 'assistant',
+      content: m?.content || '',
+      sources: Array.isArray(m?.sources) ? m.sources : [],
+      model_used: m?.model_used,
+      created_at: m?.created_at || new Date().toISOString(),
     }));
 
     return {
-      id: data.session_id || id,
-      title: data.title || 'Growth Session',
-      created_at: data.created_at || new Date().toISOString(),
-      updated_at: data.updated_at || new Date().toISOString(),
+      id: data?.session_id || id,
+      title: data?.title || 'Growth Session',
+      created_at: data?.created_at || new Date().toISOString(),
+      updated_at: data?.updated_at || new Date().toISOString(),
       messages,
     };
   },

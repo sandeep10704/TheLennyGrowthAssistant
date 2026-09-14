@@ -48,22 +48,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Conversations List */}
       <div className="flex-1 overflow-y-auto p-3 space-y-1">
         <div className="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          Recent Sessions ({conversations.length})
+          Recent Sessions ({conversations?.length || 0})
         </div>
 
-        {conversations.length === 0 ? (
+        {(conversations || []).length === 0 ? (
           <div className="text-xs text-slate-400 px-3 py-6 text-center leading-relaxed">
             No previous sessions.<br />Ask a question or request an artifact to begin!
           </div>
         ) : (
-          conversations.map((conv) => {
-            const isActive = conv.id === activeId;
+          (conversations || []).map((conv) => {
+            const isActive = conv?.id === activeId;
             return (
               <div
-                key={conv.id}
+                key={conv?.id}
                 onClick={() => {
-                  onSelect(conv.id);
-                  if (onCloseMobile) onCloseMobile();
+                  if (conv?.id) {
+                    onSelect(conv.id);
+                    if (onCloseMobile) onCloseMobile();
+                  }
                 }}
                 className={`group flex items-center justify-between px-3 py-2.5 text-xs rounded-xl cursor-pointer transition ${
                   isActive
@@ -73,12 +75,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <div className="flex items-center space-x-2.5 truncate mr-2">
                   <MessageSquare className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-brand-500' : 'text-slate-400'}`} />
-                  <span className="truncate">{conv.title}</span>
+                  <span className="truncate">{conv?.title || 'Growth Session'}</span>
                 </div>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDelete(conv.id);
+                    if (conv?.id) onDelete(conv.id);
                   }}
                   className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 transition rounded"
                   title="Delete session"

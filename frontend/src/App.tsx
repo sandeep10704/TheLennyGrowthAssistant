@@ -39,8 +39,8 @@ export const App: React.FC = () => {
 
   // Auto-detect artifacts generated in assistant messages
   useEffect(() => {
-    messages.forEach((msg) => {
-      if (msg.role !== 'assistant') return;
+    (messages || []).forEach((msg) => {
+      if (!msg || msg.role !== 'assistant' || !msg.content) return;
 
       // 1. Extract HTML artifact
       const htmlMatch =

@@ -29,12 +29,19 @@ export interface ComponentStatus {
 }
 
 export interface HealthStatus {
-  status: 'healthy' | 'degraded';
-  version: string;
-  environment: string;
-  database: ComponentStatus;
-  vector_store: ComponentStatus;
-  llm: ComponentStatus;
+  status?: 'healthy' | 'degraded' | string;
+  version?: string;
+  environment?: string;
+  timestamp?: string;
+  components?: {
+    database?: ComponentStatus;
+    vector_store?: ComponentStatus;
+    llm?: ComponentStatus;
+    [key: string]: any;
+  };
+  database?: ComponentStatus;
+  vector_store?: ComponentStatus;
+  llm?: ComponentStatus;
 }
 
 export interface ChatPayload {

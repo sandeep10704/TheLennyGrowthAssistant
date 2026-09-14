@@ -14,15 +14,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onOpenArt
 
   // Detect embedded artifacts in assistant messages
   const { textContent, artifact } = useMemo(() => {
-    if (isUser) {
-      return { textContent: message.content, artifact: null };
+    const rawContent = message?.content || '';
+    if (isUser || !rawContent) {
+      return { textContent: rawContent, artifact: null };
     }
 
     // 1. Check for HTML code block ```html <!DOCTYPE ...> ```
-    const fencedHtml = message.content.match(/```(?:html)?\s*(<!DOCTYPE html[\s\S]+?|<html>[\s\S]+?)```/i);
+    const fencedHtml = rawContent.match(/```(?:html)?\s*(<!DOCTYPE html[\s\S]+?|<html>[\s\S]+?)```/i);
     if (fencedHtml) {
       const code = fencedHtml[1].trim();
-      const cleanText = message.content.replace(fencedHtml[0], '').trim();
+      const cleanText = rawContent.replace(fencedHtml[0], '').trim();
       return {
         textContent: cleanText,
         artifact: { type: 'html' as const, content: code, title: 'Interactive Web Tool' },
@@ -30,10 +31,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onOpenArt
     }
 
     // 2. Check for standalone <!DOCTYPE html> ... </html>
-    const rawDocMatch = message.content.match(/(<!DOCTYPE html[\s\S]+?<\/html>)/i);
+    const rawDocMatch = rawContent.match(/(<!DOCTYPE html[\s\S]+?<\/html>)/i);
     if (rawDocMatch) {
       const code = rawDocMatch[1].trim();
-      const cleanText = message.content.replace(rawDocMatch[0], '').trim();
+      const cleanText = rawContent.replace(rawDocMatch[0], '').trim();
       return {
         textContent: cleanText,
         artifact: { type: 'html' as const, content: code, title: 'Interactive Web Tool' },
@@ -41,18 +42,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onOpenArt
     }
 
     // 3. Check for Markdown code block containing tables or checklists
-    const mdBlockMatch = message.content.match(/```(?:markdown|md)\s*([\s\S]+?)```/i);
+    const mdBlockMatch = rawContent.match(/```(?:markdown|md)\s*([\s\S]+?)```/i);
     if (mdBlockMatch && (mdBlockMatch[1].includes('|') || mdBlockMatch[1].includes('- [ ]') || mdBlockMatch[1].includes('# '))) {
       const code = mdBlockMatch[1].trim();
-      const cleanText = message.content.replace(mdBlockMatch[0], '').trim();
+      const cleanText = rawContent.replace(mdBlockMatch[0], '').trim();
       return {
         textContent: cleanText,
         artifact: { type: 'markdown' as const, content: code, title: 'Product Playbook / Spec' },
       };
     }
 
-    return { textContent: message.content, artifact: null };
-  }, [message.content, isUser]);
+    return { textContent: rawContent, artifact: null };
+  }, [message?.content, isUser]);
 
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
@@ -105,7 +106,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onOpenArt
           )}
 
           {/* Source Citations for Assistant Responses */}
-          {!isUser && message.sources && message.sources.length > 0 && (
+          {!isUser && Array.isArray(message?.sources) && message.sources.length > 0 && (
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
               <button
                 onClick={() => setSourcesOpen(!sourcesOpen)}
@@ -127,17 +128,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onOpenArt
                   {message.sources.map((src, idx) => (
                     <div key={idx} className="bg-white p-2.5 rounded-lg border border-slate-100 space-y-1 shadow-2xs">
                       <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
-                        <span>{src.title || `Source #${idx + 1}`}</span>
-                        {src.relevance_score !== undefined && (
+                        <span>{src?.title || `Source #${idx + 1}`}</span>
+                        {src?.relevance_score !== undefined && (
                           <span className="text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.2 rounded text-[10px]">
                             Similarity: {(src.relevance_score * 100).toFixed(0)}%
                           </span>
                         )}
                       </div>
                       <p className="text-slate-500 text-[11px] line-clamp-3 leading-normal font-sans">
-                        {src.content}
+                        {src?.content || ''}
                       </p>
-                      {src.source && (
+                      {src?.source && (
                         <span className="text-[10px] text-slate-400 font-mono block">
                           File: {src.source}
                         </span>

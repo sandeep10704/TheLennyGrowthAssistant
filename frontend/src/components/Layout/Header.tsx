@@ -80,20 +80,24 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Backend & Vector DB Status */}
         {loading ? (
           <span className="text-[11px] text-slate-400 hidden lg:inline">Connecting...</span>
-        ) : health ? (
+        ) : (
           <div className="hidden lg:flex items-center space-x-2 border-l border-slate-200 pl-3">
             <div className="flex items-center space-x-1 text-[11px] text-slate-500">
               <Database className="w-3 h-3 text-slate-400" />
               <span>Postgres:</span>
-              <StatusBadge status={health.database.status} />
+              <StatusBadge
+                status={health?.components?.database?.status ?? health?.database?.status ?? 'unavailable'}
+              />
             </div>
             <div className="flex items-center space-x-1 text-[11px] text-slate-500">
               <Layers className="w-3 h-3 text-slate-400" />
               <span>Chroma:</span>
-              <StatusBadge status={health.vector_store.status} />
+              <StatusBadge
+                status={health?.components?.vector_store?.status ?? health?.vector_store?.status ?? 'unavailable'}
+              />
             </div>
           </div>
-        ) : null}
+        )}
 
         {/* Split Screen Artifact Viewer Toggle Button */}
         {onToggleArtifacts && (

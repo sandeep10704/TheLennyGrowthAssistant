@@ -63,7 +63,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 max-w-4xl mx-auto w-full">
-      {messages.length === 0 ? (
+      {(messages || []).length === 0 ? (
         <div className="flex flex-col items-center justify-center min-h-[65vh] text-center">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-500 to-amber-500 flex items-center justify-center text-white mb-4 shadow-md shadow-brand-500/20">
             <Sparkles className="w-7 h-7" />
@@ -103,9 +103,9 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          {messages.map((msg) => (
+          {(messages || []).map((msg, idx) => (
             <MessageBubble
-              key={msg.id}
+              key={msg?.id || `msg-${idx}`}
               message={msg}
               onOpenArtifact={onOpenArtifact}
             />
