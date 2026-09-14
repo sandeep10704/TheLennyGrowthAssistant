@@ -1,39 +1,57 @@
 import React, { useState, useMemo } from 'react';
-import { Sparkles, User, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
-import { Message } from '../../types';
+import { Sparkles, User, ChevronDown, ChevronUp, BookOpen, ExternalLink } from 'lucide-react';
+import { Message, Artifact } from '../../types';
 import { SecureArtifactViewer } from '../Artifact';
 
 interface MessageBubbleProps {
   message: Message;
+  onOpenArtifact?: (artifact: Artifact) => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, onOpenArtifact }) => {
   const isUser = message.role === 'user';
   const [sourcesOpen, setSourcesOpen] = useState(false);
 
-  // Detect embedded HTML artifacts in assistant messages
-  const { textContent, artifactHtml } = useMemo(() => {
+  // Detect embedded artifacts in assistant messages
+  const { textContent, artifact } = useMemo(() => {
     if (isUser) {
-      return { textContent: message.content, artifactHtml: null };
+      return { textContent: message.content, artifact: null };
     }
 
-    // 1. Check for fenced ```html <!DOCTYPE ...> ```
-    const fencedMatch = message.content.match(/```(?:html)?\s*(<!DOCTYPE html[\s\S]+?|<html>[\s\S]+?)```/i);
-    if (fencedMatch) {
-      const artifact = fencedMatch[1].trim();
-      const cleanText = message.content.replace(fencedMatch[0], '').trim();
-      return { textContent: cleanText, artifactHtml: artifact };
+    // 1. Check for HTML code block ```html <!DOCTYPE ...> ```
+    const fencedHtml = message.content.match(/```(?:html)?\s*(<!DOCTYPE html[\s\S]+?|<html>[\s\S]+?)```/i);
+    if (fencedHtml) {
+      const code = fencedHtml[1].trim();
+      const cleanText = message.content.replace(fencedHtml[0], '').trim();
+      return {
+        textContent: cleanText,
+        artifact: { type: 'html' as const, content: code, title: 'Interactive Web Tool' },
+      };
     }
 
     // 2. Check for standalone <!DOCTYPE html> ... </html>
     const rawDocMatch = message.content.match(/(<!DOCTYPE html[\s\S]+?<\/html>)/i);
     if (rawDocMatch) {
-      const artifact = rawDocMatch[1].trim();
+      const code = rawDocMatch[1].trim();
       const cleanText = message.content.replace(rawDocMatch[0], '').trim();
-      return { textContent: cleanText, artifactHtml: artifact };
+      return {
+        textContent: cleanText,
+        artifact: { type: 'html' as const, content: code, title: 'Interactive Web Tool' },
+      };
     }
 
-    return { textContent: message.content, artifactHtml: null };
+    // 3. Check for Markdown code block containing tables or checklists
+    const mdBlockMatch = message.content.match(/```(?:markdown|md)\s*([\s\S]+?)```/i);
+    if (mdBlockMatch && (mdBlockMatch[1].includes('|') || mdBlockMatch[1].includes('- [ ]') || mdBlockMatch[1].includes('# '))) {
+      const code = mdBlockMatch[1].trim();
+      const cleanText = message.content.replace(mdBlockMatch[0], '').trim();
+      return {
+        textContent: cleanText,
+        artifact: { type: 'markdown' as const, content: code, title: 'Product Playbook / Spec' },
+      };
+    }
+
+    return { textContent: message.content, artifact: null };
   }, [message.content, isUser]);
 
   return (
@@ -64,13 +82,26 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
             </div>
           )}
 
-          {/* Secure Interactive Artifact Sandbox */}
-          {artifactHtml && (
-            <SecureArtifactViewer
-              content={artifactHtml}
-              type="html"
-              title="Interactive Growth Artifact"
-            />
+          {/* Secure Interactive Artifact Sandbox / Viewer */}
+          {artifact && (
+            <div className="relative">
+              <SecureArtifactViewer
+                content={artifact.content}
+                type={artifact.type}
+                title={artifact.title}
+              />
+              {onOpenArtifact && (
+                <div className="flex justify-end mt-1">
+                  <button
+                    onClick={() => onOpenArtifact(artifact)}
+                    className="inline-flex items-center space-x-1 text-[11px] text-brand-600 hover:text-brand-700 font-medium px-2 py-0.5 rounded hover:bg-brand-50 transition"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Open in Artifact Studio Panel</span>
+                  </button>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Source Citations for Assistant Responses */}
@@ -94,18 +125,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
               {sourcesOpen && (
                 <div className="mt-2.5 space-y-2 border-t border-slate-200/60 pt-2">
                   {message.sources.map((src, idx) => (
-                    <div key={idx} className="bg-white p-2.5 rounded-lg border border-slate-100 space-y-1">
+                    <div key={idx} className="bg-white p-2.5 rounded-lg border border-slate-100 space-y-1 shadow-2xs">
                       <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700">
                         <span>{src.title || `Source #${idx + 1}`}</span>
                         {src.relevance_score !== undefined && (
-                          <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                            Score: {src.relevance_score}
+                          <span className="text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.2 rounded text-[10px]">
+                            Similarity: {(src.relevance_score * 100).toFixed(0)}%
                           </span>
                         )}
                       </div>
-                      <p className="text-slate-500 text-[11px] line-clamp-3 leading-normal">
+                      <p className="text-slate-500 text-[11px] line-clamp-3 leading-normal font-sans">
                         {src.content}
                       </p>
+                      {src.source && (
+                        <span className="text-[10px] text-slate-400 font-mono block">
+                          File: {src.source}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
