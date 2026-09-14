@@ -67,36 +67,79 @@ lenny-growth-assistant/
 
 ---
 
-## ⚡ Quick Start
+## 🐳 One-Command Docker Setup
 
-### 1. Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (v20+)
-- [Python](https://www.python.org/) 3.10+
-- [Node.js](https://nodejs.org/) 18+ (for local frontend development)
-- (Optional) [Ollama](https://ollama.com/) installed locally for offline LLM support
+The entire stack is configured to run with a single command using Docker Compose.
 
-### 2. Clone & Setup Environment
+### 1. Configure Environment Variables
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd lenny-growth-assistant
-
-# Create environment file from template
+# Copy template to active .env
 cp .env.example .env
 ```
+Edit `.env` to set your preferences:
+- `LLM_PROVIDER`: `openai` or `ollama`
+- `OPENAI_API_KEY`: Your OpenAI API key (if using OpenAI)
+- `DATABASE_URL`: Set your Supabase connection string, or leave blank to automatically use the local PostgreSQL container.
 
-Edit `.env` to configure your `OPENAI_API_KEY`, Supabase/Postgres credentials, and LLM preferences.
-
-### 3. Run with Docker Compose (Recommended)
+### 2. Start All Services
 ```bash
-# Build and spin up all services (Backend, Frontend, Postgres, Chroma)
-docker compose up --build
+# Launch backend, frontend, chroma, and local postgres (if not using Supabase)
+docker-compose up --build
 ```
 
-- **Frontend UI**: [http://localhost:3000](http://localhost:3000)
-- **Backend API**: [http://localhost:8000](http://localhost:8000)
-- **Interactive Swagger Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ChromaDB**: [http://localhost:8001](http://localhost:8001)
+### 3. Service Ports & Access Points
+| Service | URL | Description |
+| :--- | :--- | :--- |
+| **Frontend UI** | [http://localhost:3000](http://localhost:3000) | Split-screen Chat & Sandboxed Artifact Viewer |
+| **Backend REST API** | [http://localhost:8000](http://localhost:8000) | FastAPI server & Health check (`/health`) |
+| **Interactive Swagger** | [http://localhost:8000/docs](http://localhost:8000/docs) | OpenAPI interactive schema explorer |
+| **Chroma Vector DB** | [http://localhost:8001](http://localhost:8001) | RAG embeddings vector collection |
+| **PostgreSQL** | `localhost:5432` | Relational store (skipped if using Supabase) |
+
+---
+
+## 🦙 Ollama Local LLM Integration
+
+Run 100% private, local inference without external API costs or data transmission.
+
+### Option A: Run Ollama on Host Machine (Recommended for GPU Acceleration)
+1. Install Ollama from [ollama.com](https://ollama.com) and pull the models:
+   ```bash
+   ollama pull llama3
+   ollama pull nomic-embed-text
+   ```
+2. In `.env`, set:
+   ```ini
+   LLM_PROVIDER=ollama
+   OLLAMA_BASE_URL=http://host.docker.internal:11434
+   OLLAMA_MODEL=llama3
+   OLLAMA_EMBEDDING_MODEL=nomic-embed-text
+   ```
+   *(The backend container connects via `host.docker.internal:host-gateway`)*.
+3. Run `docker-compose up`.
+
+### Option B: Run Ollama Completely in Docker
+```bash
+# Boot the stack including the containerized Ollama service
+docker compose --profile ollama up -d
+
+# Download models into the container
+docker exec -it lenny-ollama ollama pull llama3
+docker exec -it lenny-ollama ollama pull nomic-embed-text
+```
+
+For comprehensive troubleshooting and network bridge configurations, see [docs/OLLAMA_INTEGRATION.md](file:///C:/Users/saive/Documents/clg/project01/docs/OLLAMA_INTEGRATION.md).
+
+---
+
+## 🗄️ Database Options: Local PostgreSQL vs. Supabase
+
+- **Option A: Local PostgreSQL (Zero Setup)**: Leave `DATABASE_URL` blank or commented out in `.env`. Docker Compose automatically spins up the `postgres:16-alpine` container, creates tables, and handles connection pooling and retries.
+- **Option B: Remote Supabase**: Supply your Supabase connection string in `.env`:
+  ```ini
+  DATABASE_URL=postgresql+asyncpg://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.co:6543/postgres
+  ```
+  The backend automatically uses Supabase, rendering the local PostgreSQL container optional.
 
 ---
 

@@ -1,9 +1,21 @@
-version: "3.9"
+# ==============================================================================
+# Lenny Growth Assistant - Full-Stack Production & Local Docker Orchestration
+# ==============================================================================
+# Single Command Execution:
+#   docker-compose up
+#
+# Services:
+#   1. backend   - FastAPI REST API, Vector RAG Engine, Agent Router (Port 8000)
+#   2. frontend  - React (Vite) Single Page App with Nginx Reverse Proxy (Port 3000)
+#   3. postgres  - PostgreSQL 16 database (Optional if using Supabase) (Port 5432)
+#   4. chroma    - Chroma Vector Database for Lenny transcript chunks (Port 8001)
+#   5. ollama    - Optional local LLM container (profile: ollama) (Port 11434)
+# ==============================================================================
 
 services:
-  # ============================================================================
-  # PostgreSQL Database (Supabase Compatible)
-  # ============================================================================
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL Database (Optional - used when not connecting to Supabase)
+  # ----------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: lenny-postgres
@@ -13,7 +25,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-lenny_growth}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,9 +36,9 @@ services:
     networks:
       - lenny-network
 
-  # ============================================================================
-  # Chroma Vector Database
-  # ============================================================================
+  # ----------------------------------------------------------------------------
+  # 2. Chroma Vector Database (Persistent Knowledge Store)
+  # ----------------------------------------------------------------------------
   chroma:
     image: chromadb/chroma:latest
     container_name: lenny-chromadb
@@ -41,9 +53,9 @@ services:
     networks:
       - lenny-network
 
-  # ============================================================================
-  # FastAPI Backend Service
-  # ============================================================================
+  # ----------------------------------------------------------------------------
+  # 3. FastAPI Backend Service
+  # ----------------------------------------------------------------------------
   backend:
     build:
       context: .
@@ -51,16 +63,19 @@ services:
     container_name: lenny-backend
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
+    env_file:
+      - .env
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-development}
+      # If DATABASE_URL is set in .env (e.g. Supabase), it is used; otherwise defaults to local postgres container
       - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/lenny_growth}
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
       - CHROMA_COLLECTION_NAME=${CHROMA_COLLECTION_NAME:-lenny_growth_knowledge}
       - LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
@@ -68,17 +83,19 @@ services:
       - ALLOWED_CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000"]
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: service_started
+        required: false
       chroma:
         condition: service_started
     extra_hosts:
+      # Resolves host machine from inside Docker container for Ollama running on host OS
       - "host.docker.internal:host-gateway"
     networks:
       - lenny-network
 
-  # ============================================================================
-  # React (Vite) Frontend Service
-  # ============================================================================
+  # ----------------------------------------------------------------------------
+  # 4. React (Vite) Frontend Service
+  # ----------------------------------------------------------------------------
   frontend:
     build:
       context: .
@@ -88,18 +105,44 @@ services:
     container_name: lenny-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       - backend
     networks:
       - lenny-network
 
+  # ----------------------------------------------------------------------------
+  # 5. Optional In-Docker Ollama Service (profile: ollama)
+  # Run: docker compose --profile ollama up
+  # ----------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: lenny-ollama
+    profiles:
+      - ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - lenny-network
+
+# ==============================================================================
+# Networks & Volumes
+# ==============================================================================
 networks:
   lenny-network:
+    name: lenny-growth-network
     driver: bridge
 
 volumes:
   postgres_data:
+    name: lenny-postgres-data
     driver: local
   chroma_data:
+    name: lenny-chroma-data
+    driver: local
+  ollama_models:
+    name: lenny-ollama-models
     driver: local
