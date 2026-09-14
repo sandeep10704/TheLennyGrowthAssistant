@@ -1,7 +1,10 @@
+from typing import List
 from fastapi import APIRouter, Depends, status
-from models.schemas import ChatRequest, ChatResponse, SessionDetailResponse
+from models.schemas import ChatRequest, ChatResponse, SessionDetailResponse, SourceCitation
 from services.chat_service import ChatService, get_chat_service
 from services.session_service import SessionService, get_session_service
+from services.vector_service import VectorService, get_vector_service
+from services.exceptions import EmptyRAGResultsError
 
 router = APIRouter(tags=["Chat"])
 
@@ -66,3 +69,24 @@ async def delete_session(
     """Delete a chat session and its associated conversation history."""
     await session_service.delete_session(session_id)
     return None
+
+
+@router.get(
+    "/knowledge/search",
+    response_model=List[SourceCitation],
+    summary="Semantic Search in Growth Knowledge Base",
+    description="Searches Lenny's growth playbook. If no matching chunks are found, raises a user-friendly EmptyRAGResultsError (HTTP 404).",
+)
+async def search_knowledge(
+    query: str,
+    top_k: int = 5,
+    vector_service: VectorService = Depends(get_vector_service),
+):
+    """
+    Direct semantic search in the growth knowledge base.
+    Raises EmptyRAGResultsError with a helpful user message if 0 chunks are found.
+    """
+    sources = vector_service.query_knowledge(query=query, top_k=top_k)
+    if not sources:
+        raise EmptyRAGResultsError(query=query)
+    return sources

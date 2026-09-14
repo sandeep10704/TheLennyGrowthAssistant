@@ -124,10 +124,11 @@ class VectorService:
             logger.warning(f"Knowledge seeding notice: {e}")
 
     def query_knowledge(self, query: str, top_k: int = 4) -> List[SourceCitation]:
-        """Perform semantic search against Lenny knowledge base."""
+        """Perform semantic search against Lenny knowledge base with logging and empty results handling."""
         try:
             count = self.collection.count()
             if count == 0:
+                logger.warning("⚠️ [Empty RAG Collection] Knowledge base is empty (0 documents in Chroma). No citations to retrieve.")
                 return []
 
             results = self.collection.query(
@@ -146,6 +147,10 @@ class VectorService:
                     dist = distances[idx] if idx < len(distances) else None
                     score = round(max(0.0, 1.0 - dist), 4) if dist is not None else None
 
+                    # Filter out chunks that do not meet semantic relevance threshold
+                    if score is not None and score < settings.RAG_MIN_RELEVANCE_SCORE:
+                        continue
+
                     citations.append(
                         SourceCitation(
                             title=meta.get("title", "Growth Playbook"),
@@ -155,9 +160,15 @@ class VectorService:
                             metadata=meta,
                         )
                     )
+
+            if citations:
+                logger.info(f"📚 [RAG Retrieved] Retrieved {len(citations)} knowledge chunks for query: '{query[:60]}...'")
+            else:
+                logger.info(f"ℹ️ [Empty RAG Results] 0 knowledge chunks matched query: '{query[:60]}...'. Baseline growth heuristics will be used.")
+
             return citations
         except Exception as e:
-            logger.error(f"Vector search failed: {e}")
+            logger.error(f"❌ [RAG Vector Error] Vector search query failed: {e}", exc_info=True)
             return []
 
     def health_check(self) -> Dict[str, Any]:

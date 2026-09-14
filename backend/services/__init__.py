@@ -4,6 +4,9 @@ from services.exceptions import (
     InvalidProviderError,
     LLMServiceError,
     LLMTimeoutError,
+    MissingAPIKeyError,
+    DatabaseError,
+    EmptyRAGResultsError,
     VectorStoreError,
 )
 from services.db_retry import execute_with_db_retry, with_db_retry

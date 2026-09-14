@@ -125,7 +125,7 @@ class Ship30EssayGenerator:
                 system_template=prompt,
                 temperature=0.72,
             )
-            if len(expanded_text.split()) > 200:
+            if len(expanded_text.split()) > 20:
                 return expanded_text
         except Exception as e:
             logger.warning(f"LLM expansion notice (using heuristic synthesis): {e}")
@@ -154,17 +154,13 @@ class Ship30EssayGenerator:
             elif line.startswith("## "):
                 subtitle = line.replace("## ", "").strip()
 
-        # 2. Extract Hook (First 1-3 non-header paragraphs)
+        # 2. Extract Hook (First 1-3 non-header paragraphs before first ### section)
         hook_paragraphs = []
-        body_lines = []
-        in_body = False
-
         for line in lines:
-            if line.startswith("### ") or line.startswith("## ") or line.startswith("# "):
-                in_body = True
-            if not in_body and line.strip() and not line.startswith("#"):
+            if line.startswith("### "):
+                break
+            if line.strip() and not line.startswith("#"):
                 hook_paragraphs.append(line.strip())
-            body_lines.append(line)
 
         hook = " ".join(hook_paragraphs[:3]) if hook_paragraphs else (
             "Most founders believe their startup died from lack of capital or slow marketing. "

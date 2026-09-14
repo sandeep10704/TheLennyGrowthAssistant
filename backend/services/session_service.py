@@ -85,7 +85,7 @@ class SessionService:
                 operation_name="Auto-Create Session",
             )
         except Exception as e:
-            logger.warning(f"Database auto-create session fallback to memory: {e}")
+            logger.error(f"❌ [DB Failure] Auto-create session '{sid}' in database failed: {e}. Falling back to in-memory session store.")
             if sid not in self._memory_cache:
                 self._memory_cache[sid] = []
                 self._sessions_meta_cache[sid] = {
@@ -157,7 +157,7 @@ class SessionService:
                 operation_name="Store User Message",
             )
         except Exception as e:
-            logger.warning(f"Database store user message notice (using cache): {e}")
+            logger.error(f"❌ [DB Failure] Storing user message to DB failed: {e}. Message preserved in memory session cache.")
             return msg_id
 
     async def add_assistant_message(
@@ -215,7 +215,7 @@ class SessionService:
                 operation_name="Store Assistant Message",
             )
         except Exception as e:
-            logger.warning(f"Database store assistant message notice (using cache): {e}")
+            logger.error(f"❌ [DB Failure] Storing assistant message to DB failed: {e}. Message preserved in memory session cache.")
             return msg_id
 
     # --------------------------------------------------------------------------

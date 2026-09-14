@@ -29,6 +29,7 @@ async def health_check():
         async with async_session_factory() as session:
             await session.execute(text("SELECT 1"))
     except Exception as e:
+        logger.warning(f"❌ [DB Failure] Database health check probe failed: {e}")
         db_status = HealthComponentStatus(
             status="degraded",
             details={"error": f"Database unreachable: {str(e)}", "pool": pool_stats},

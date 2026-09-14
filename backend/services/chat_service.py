@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 
 from config.settings import logger
 from models.schemas import ChatRequest, ChatResponse, SourceCitation
+from services.exceptions import EmptyRAGResultsError
 from services.session_service import SessionService, get_session_service
 from services.vector_service import VectorService, get_vector_service
 from services.llm_service import LLMService, get_llm_service
@@ -58,14 +59,26 @@ class ChatService:
             top_k=request.top_k_sources or 5,
         )
 
-        # 4. Format context block
+        if request.require_rag and not sources:
+            logger.warning(f"⚠️ [Empty RAG Strict] 'require_rag' was set but 0 sources found for: '{request.message[:60]}'")
+            raise EmptyRAGResultsError(query=request.message)
+
+        # 4. Format context block with transparent RAG fallback
         if sources:
             context_blocks = []
             for i, src in enumerate(sources):
                 context_blocks.append(f"[{i+1}] {src.title}:\n{src.content}")
             context_text = "\n\n".join(context_blocks)
+            logger.info(f"📚 [Chat RAG] Injected {len(sources)} citations into LLM context for session '{session_id}'.")
         else:
-            context_text = "No direct playbook matches found. Rely on general Lenny Rachitsky growth heuristics."
+            logger.info(
+                f"ℹ️ [Empty RAG Results] Query '{request.message[:50]}...' had no direct vector matches. "
+                "Synthesizing baseline Lenny growth frameworks."
+            )
+            context_text = (
+                "No direct excerpt from Lenny's playbooks matched this specific query. "
+                "Synthesize grounded advice using Lenny Rachitsky's fundamental product management and startup growth heuristics."
+            )
 
         # 5. Fetch recent conversational history for memory
         history = await self.session_service.get_session_history(session_id=session_id, limit=8)
@@ -100,6 +113,11 @@ class ChatService:
             content=response_content,
             sources=sources,
             model_used=f"{provider_used}:{model_used}",
+        )
+
+        logger.info(
+            f"✅ [Chat Completed] Session '{session_id}': Generated response using {provider_used}:{model_used} "
+            f"({len(sources)} sources, {len(response_content)} chars)."
         )
 
         # 9. Return structured response

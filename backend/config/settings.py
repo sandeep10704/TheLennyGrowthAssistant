@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     CHROMA_COLLECTION_NAME: str = "lenny_growth_knowledge"
     CHROMA_PERSISTENCE_DIR: str = "./chroma_data"
     CHROMA_USE_HTTP: bool = True
+    RAG_MIN_RELEVANCE_SCORE: float = 0.05
 
     # LLM Providers (Active: "openai" or "ollama")
     LLM_PROVIDER: str = "openai"

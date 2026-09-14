@@ -48,6 +48,10 @@ class ChatRequest(BaseModel):
         le=10,
         description="Number of relevant knowledge chunks to retrieve from vector store (default: 5)."
     )
+    require_rag: Optional[bool] = Field(
+        default=False,
+        description="If True, raises EmptyRAGResultsError when no relevant knowledge base chunks match."
+    )
 
 
 class ChatResponse(BaseModel):
@@ -96,10 +100,12 @@ class HealthResponse(BaseModel):
 
 
 class ErrorResponse(BaseModel):
-    """Standardized error response payload."""
+    """Standardized error response payload with user-friendly guidance."""
     success: bool = False
     error: str = Field(..., description="Brief error classification")
-    detail: Optional[Any] = Field(default=None, description="Detailed explanation or validation details")
+    user_message: Optional[str] = Field(default=None, description="Clear, user-friendly explanation of the issue")
+    actionable_tip: Optional[str] = Field(default=None, description="Actionable recommendation to resolve the issue")
+    detail: Optional[Any] = Field(default=None, description="Detailed technical or validation details")
     code: str = Field(..., description="Machine-readable error code")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

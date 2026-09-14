@@ -8,6 +8,7 @@ from services.exceptions import (
     LLMServiceError,
     LLMTimeoutError,
     InvalidProviderError,
+    MissingAPIKeyError,
 )
 
 DEFAULT_SYSTEM_TEMPLATE = """You are Lenny Growth Assistant, an executive product & growth advisor modeled after Lenny Rachitsky's product frameworks, newsletter, and podcast interviews.
@@ -77,11 +78,9 @@ class OpenAIProvider(BaseLLMProvider):
         max_tokens: int = 1500,
         timeout: float = settings.LLM_TIMEOUT_SECONDS,
     ) -> str:
-        if not self.client or not self.api_key or self.api_key.startswith("your_"):
-            raise LLMServiceError(
-                provider="openai",
-                reason="OPENAI_API_KEY is not configured in environment.",
-            )
+        if not self.client or not self.api_key or self.api_key.startswith("your_") or "placeholder" in self.api_key.lower():
+            logger.warning("🔑 [Missing API Key] OpenAI API key is missing or placeholder.")
+            raise MissingAPIKeyError(provider="openai", key_name="OPENAI_API_KEY")
 
         target_model = model or self.default_model
         try:
@@ -98,13 +97,21 @@ class OpenAIProvider(BaseLLMProvider):
             return response.choices[0].message.content or ""
 
         except asyncio.TimeoutError:
-            logger.error(f"[OpenAIProvider] Generation timed out after {timeout}s.")
+            logger.error(f"⏱️ [LLM Timeout] OpenAI generation timed out after {timeout:.1f}s.")
             raise LLMTimeoutError(provider="openai", timeout_seconds=timeout)
-        except LLMTimeoutError:
+        except (LLMTimeoutError, MissingAPIKeyError):
             raise
         except Exception as e:
-            logger.error(f"[OpenAIProvider] Invocation failed: {e}")
-            raise LLMServiceError(provider="openai", reason=str(e))
+            err_str = str(e)
+            if "insufficient_quota" in err_str or "credit_balance_exhausted" in err_str or "429" in err_str:
+                logger.warning(f"💳 [OpenAI Quota Exhausted] {e}")
+                raise LLMServiceError(
+                    provider="openai",
+                    reason="OpenAI API account credit balance is exhausted.",
+                    user_message="Your OpenAI credit balance is exhausted. Please add credits at platform.openai.com or switch to the local Ollama provider for free inference.",
+                )
+            logger.error(f"❌ [OpenAIProvider] Invocation failed: {e}")
+            raise LLMServiceError(provider="openai", reason=err_str)
 
     async def health_check(self) -> Dict[str, Any]:
         configured = bool(self.api_key and not self.api_key.startswith("your_"))
@@ -182,27 +189,35 @@ class OllamaProvider(BaseLLMProvider):
 
                     raise LLMServiceError(
                         provider="ollama",
-                        reason=f"HTTP {res.status_code}: {res.text}",
+                        reason=f"Model '{target_model}' not found in Ollama library (HTTP 404).",
+                        user_message=f"Model '{target_model}' is not installed in your local Ollama daemon. Run 'ollama pull {target_model}' in your host terminal to install it.",
                     )
                 else:
                     raise LLMServiceError(
                         provider="ollama",
                         reason=f"HTTP {res.status_code}: {res.text}",
+                        user_message=f"Ollama server returned error (HTTP {res.status_code}). Please verify the Ollama daemon logs.",
                     )
 
         except (asyncio.TimeoutError, httpx.TimeoutException):
-            logger.error(f"[OllamaProvider] Local request timed out after {timeout}s.")
+            logger.error(f"⏱️ [LLM Timeout] Local Ollama request timed out after {timeout:.1f}s.")
             raise LLMTimeoutError(provider="ollama", timeout_seconds=timeout)
         except httpx.ConnectError:
+            logger.error(f"🔌 [Ollama Offline] Cannot connect to local Ollama daemon at {self.base_url}.")
             raise LLMServiceError(
                 provider="ollama",
-                reason=f"Cannot connect to local Ollama daemon at {self.base_url}. Ensure 'ollama serve' is running.",
+                reason=f"Cannot connect to local Ollama daemon at {self.base_url}.",
+                user_message=f"Cannot connect to the local Ollama service at {self.base_url}. Please ensure 'ollama serve' is running on your host machine.",
             )
         except (LLMServiceError, LLMTimeoutError):
             raise
         except Exception as e:
-            logger.error(f"[OllamaProvider] Request failed: {e}")
-            raise LLMServiceError(provider="ollama", reason=str(e))
+            logger.error(f"❌ [OllamaProvider] Request failed: {e}")
+            raise LLMServiceError(
+                provider="ollama",
+                reason=str(e),
+                user_message="An unexpected error occurred while communicating with the Ollama model.",
+            )
 
     async def health_check(self) -> Dict[str, Any]:
         try:
@@ -293,14 +308,24 @@ class LLMService:
         try:
             primary_provider = self.get_provider(primary_name)
             logger.info(f"Generating response using primary LLM provider '{primary_name}' (timeout={timeout_val}s)...")
-            return await primary_provider.generate(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                timeout=timeout_val,
-            )
+            try:
+                return await asyncio.wait_for(
+                    primary_provider.generate(
+                        messages=messages,
+                        model=model,
+                        temperature=temperature,
+                        timeout=timeout_val,
+                    ),
+                    timeout=timeout_val,
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"⏱️ [LLM Timeout] Primary provider '{primary_name}' timed out after {timeout_val:.1f}s.")
+                raise LLMTimeoutError(provider=primary_name, timeout_seconds=timeout_val)
 
         except (LLMServiceError, LLMTimeoutError, Exception) as primary_exc:
+            if isinstance(primary_exc, InvalidProviderError):
+                raise primary_exc
+
             if not fallback_allowed:
                 raise primary_exc
 
@@ -315,12 +340,19 @@ class LLMService:
 
             try:
                 fallback_provider = self.get_provider(fallback_name)
-                fallback_response = await fallback_provider.generate(
-                    messages=messages,
-                    temperature=temperature,
-                    timeout=fallback_timeout,
-                )
-                return fallback_response
+                try:
+                    fallback_response = await asyncio.wait_for(
+                        fallback_provider.generate(
+                            messages=messages,
+                            temperature=temperature,
+                            timeout=fallback_timeout,
+                        ),
+                        timeout=fallback_timeout,
+                    )
+                    return fallback_response
+                except asyncio.TimeoutError:
+                    logger.error(f"⏱️ [LLM Timeout] Fallback provider '{fallback_name}' timed out after {fallback_timeout:.1f}s.")
+                    raise LLMTimeoutError(provider=fallback_name, timeout_seconds=fallback_timeout)
 
             except Exception as fallback_exc:
                 logger.error(f"❌ Both primary '{primary_name}' and fallback '{fallback_name}' providers failed.")
@@ -329,6 +361,10 @@ class LLMService:
                     reason=(
                         f"Primary '{primary_name}' failed: {str(primary_exc)} | "
                         f"Fallback '{fallback_name}' failed: {str(fallback_exc)}"
+                    ),
+                    user_message=(
+                        f"Both primary ({primary_name.upper()}) and fallback ({fallback_name.upper()}) AI models were unable to respond. "
+                        "Please verify your API credentials in .env or ensure the local Ollama daemon is running."
                     ),
                 )
 
@@ -352,12 +388,20 @@ class LLMService:
 
         try:
             p = self.get_provider(primary_name)
-            content = await p.generate(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-                timeout=timeout_val,
-            )
+            try:
+                content = await asyncio.wait_for(
+                    p.generate(
+                        messages=messages,
+                        model=model,
+                        temperature=temperature,
+                        timeout=timeout_val,
+                    ),
+                    timeout=timeout_val,
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"⏱️ [LLM Timeout] Primary provider '{primary_name}' timed out after {timeout_val:.1f}s.")
+                raise LLMTimeoutError(provider=primary_name, timeout_seconds=timeout_val)
+
             return {
                 "content": content,
                 "provider": primary_name,
@@ -365,6 +409,9 @@ class LLMService:
                 "fallback_used": False,
             }
         except Exception as e:
+            if isinstance(e, InvalidProviderError):
+                raise e
+
             if not enable_fallback or not settings.LLM_FALLBACK_ENABLED:
                 raise e
 
@@ -373,11 +420,19 @@ class LLMService:
             try:
                 fb = self.get_provider(fallback_name)
                 fb_timeout = settings.OLLAMA_TIMEOUT_SECONDS if fallback_name == "ollama" else settings.LLM_TIMEOUT_SECONDS
-                content = await fb.generate(
-                    messages=messages,
-                    temperature=temperature,
-                    timeout=fb_timeout,
-                )
+                try:
+                    content = await asyncio.wait_for(
+                        fb.generate(
+                            messages=messages,
+                            temperature=temperature,
+                            timeout=fb_timeout,
+                        ),
+                        timeout=fb_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"⏱️ [LLM Timeout] Fallback provider '{fallback_name}' timed out after {fb_timeout:.1f}s.")
+                    raise LLMTimeoutError(provider=fallback_name, timeout_seconds=fb_timeout)
+
                 return {
                     "content": content,
                     "provider": fallback_name,
@@ -385,9 +440,14 @@ class LLMService:
                     "fallback_used": True,
                 }
             except Exception as fb_err:
+                logger.error(f"❌ Both primary '{primary_name}' and fallback '{fallback_name}' providers failed.")
                 raise LLMServiceError(
                     provider=f"{primary_name}->{fallback_name}",
                     reason=f"Primary error: {e} | Fallback error: {fb_err}",
+                    user_message=(
+                        f"Both primary ({primary_name.upper()}) and fallback ({fallback_name.upper()}) AI models were unable to respond. "
+                        "Please verify your API credentials in .env or ensure the local Ollama daemon is running."
+                    ),
                 )
 
     async def health_check(self) -> Dict[str, Any]:

@@ -140,9 +140,17 @@ class AgentRouter:
         # 2. Retrieve top-5 knowledge chunks from Chroma
         sources: List[SourceCitation] = self.vector_service.query_knowledge(query=query, top_k=5)
 
-        context_text = "\n\n".join(
-            f"[{i+1}] {s.title} ({s.source}):\n{s.content}" for i, s in enumerate(sources)
-        ) if sources else "Rely on proven Lenny Rachitsky product and growth heuristics."
+        if sources:
+            context_text = "\n\n".join(
+                f"[{i+1}] {s.title} ({s.source}):\n{s.content}" for i, s in enumerate(sources)
+            )
+            logger.info(f"📚 [AgentRouter RAG] Injected {len(sources)} citations for intent='answer'.")
+        else:
+            logger.info(f"ℹ️ [Empty RAG Results] 0 vector chunks matched '{query[:50]}...'. Synthesizing baseline principles.")
+            context_text = (
+                "No direct excerpt in Lenny's knowledge base matched this question. "
+                "Synthesize grounded guidance using Lenny Rachitsky's product management and growth loop principles."
+            )
 
         # 3. Generate grounded answer
         content = await self.llm_service.generate_response(

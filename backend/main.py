@@ -70,13 +70,22 @@ app.add_middleware(
 # ==============================================================================
 @app.exception_handler(AppException)
 async def app_exception_handler(request: Request, exc: AppException):
-    """Handles all domain-specific application exceptions."""
-    logger.warning(f"AppException [{exc.code}] on {request.url.path}: {exc.message}")
+    """Handles all domain-specific application exceptions with user-friendly formatting."""
+    logger.warning(
+        f"🚨 [{exc.code}] on {request.method} {request.url.path} (status={exc.status_code}): {exc.message}"
+    )
+    # Extract tip if present in detail dictionary
+    actionable_tip = None
+    if isinstance(exc.detail, dict):
+        actionable_tip = exc.detail.get("actionable_tip") or exc.detail.get("suggestion")
+
     return JSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
             success=False,
             error=exc.message,
+            user_message=getattr(exc, "user_message", exc.message),
+            actionable_tip=actionable_tip,
             detail=exc.detail,
             code=exc.code,
             timestamp=datetime.now(timezone.utc),
@@ -87,12 +96,14 @@ async def app_exception_handler(request: Request, exc: AppException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handles request body and parameter validation errors (HTTP 422)."""
-    logger.warning(f"Validation error on {request.url.path}: {exc.errors()}")
+    logger.warning(f"⚠️ Validation error on {request.method} {request.url.path}: {exc.errors()}")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=ErrorResponse(
             success=False,
             error="Request validation failed",
+            user_message="One or more fields in your request are invalid or missing.",
+            actionable_tip="Check the error details to see which field was missing or had an unexpected type.",
             detail=exc.errors(),
             code="VALIDATION_ERROR",
             timestamp=datetime.now(timezone.utc),
@@ -103,11 +114,21 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """Handles standard FastAPI/Starlette HTTP exceptions."""
+    logger.warning(f"HTTPException [{exc.status_code}] on {request.method} {request.url.path}: {exc.detail}")
+    user_msg = str(exc.detail)
+    if exc.status_code == 404:
+        user_msg = "The requested resource was not found. Please verify the URL path."
+    elif exc.status_code == 401:
+        user_msg = "Authentication is required to access this resource."
+    elif exc.status_code == 403:
+        user_msg = "You do not have permission to access this resource."
+
     return JSONResponse(
         status_code=exc.status_code,
         content=ErrorResponse(
             success=False,
             error=str(exc.detail),
+            user_message=user_msg,
             detail=exc.detail,
             code=f"HTTP_{exc.status_code}",
             timestamp=datetime.now(timezone.utc),
@@ -118,12 +139,14 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Catches all unexpected internal server errors (HTTP 500)."""
-    logger.error(f"Unhandled exception on {request.url.path}: {exc}", exc_info=True)
+    logger.error(f"💥 Unhandled exception on {request.method} {request.url.path}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=ErrorResponse(
             success=False,
             error="An unexpected internal server error occurred.",
+            user_message="We experienced an unexpected internal issue. The request has been logged and our team has been notified.",
+            actionable_tip="Please retry your request in a moment. If the issue persists, switch to the local Ollama provider.",
             detail=str(exc) if settings.DEBUG else None,
             code="INTERNAL_SERVER_ERROR",
             timestamp=datetime.now(timezone.utc),
