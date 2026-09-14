@@ -62,6 +62,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
         ) : (
           <>
             <option value="llama3">Llama 3</option>
+            <option value="llama3.1:8b">Llama 3.1 8B</option>
             <option value="mistral">Mistral</option>
             <option value="phi3">Phi-3</option>
           </>

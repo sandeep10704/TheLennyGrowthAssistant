@@ -155,6 +155,35 @@ class OllamaProvider(BaseLLMProvider):
                 if res.status_code == 200:
                     data = res.json()
                     return data.get("message", {}).get("content", "")
+                elif res.status_code == 404:
+                    # Model not found. Attempt dynamic auto-resolution against installed models in Ollama
+                    logger.warning(f"[OllamaProvider] Model '{target_model}' not found (404). Checking installed models...")
+                    try:
+                        tags_res = await client.get(f"{self.base_url}/api/tags")
+                        if tags_res.status_code == 200:
+                            models_list = tags_res.json().get("models", [])
+                            installed = [m.get("name", "") for m in models_list if m.get("name")]
+                            if installed:
+                                # Match prefix (e.g. 'llama3' matches 'llama3:latest' or 'llama3.1:8b')
+                                best_match = next(
+                                    (m for m in installed if target_model in m or m in target_model or m.startswith(target_model)),
+                                    installed[0],
+                                )
+                                logger.info(f"[OllamaProvider] Auto-resolving model '{target_model}' -> '{best_match}'")
+                                payload["model"] = best_match
+                                retry_res = await asyncio.wait_for(
+                                    client.post(f"{self.base_url}/api/chat", json=payload),
+                                    timeout=timeout,
+                                )
+                                if retry_res.status_code == 200:
+                                    return retry_res.json().get("message", {}).get("content", "")
+                    except Exception as resolve_err:
+                        logger.warning(f"[OllamaProvider] Auto-resolution failed: {resolve_err}")
+
+                    raise LLMServiceError(
+                        provider="ollama",
+                        reason=f"HTTP {res.status_code}: {res.text}",
+                    )
                 else:
                     raise LLMServiceError(
                         provider="ollama",
