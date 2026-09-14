@@ -45,3 +45,23 @@ export interface ChatPayload {
   temperature?: number;
   top_k_sources?: number;
 }
+
+export type ArtifactType = 'html' | 'markdown';
+
+export interface Artifact {
+  type: ArtifactType;
+  content: string;
+  title?: string;
+  metadata?: Record<string, any>;
+}
+
+export type SecureRenderingMode = 'iframe-sandbox' | 'sanitized-dom' | 'source-code';
+
+export interface SecurityPolicyInfo {
+  mode: SecureRenderingMode;
+  sandboxFlags: string[];
+  allowedTags: string[];
+  blockedElements: string[];
+  reasoning: string;
+}
+

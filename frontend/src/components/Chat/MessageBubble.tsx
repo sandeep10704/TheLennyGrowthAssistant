@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Sparkles, User, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { Message } from '../../types';
+import { SecureArtifactViewer } from '../Artifact';
 
 interface MessageBubbleProps {
   message: Message;
@@ -9,6 +10,31 @@ interface MessageBubbleProps {
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const isUser = message.role === 'user';
   const [sourcesOpen, setSourcesOpen] = useState(false);
+
+  // Detect embedded HTML artifacts in assistant messages
+  const { textContent, artifactHtml } = useMemo(() => {
+    if (isUser) {
+      return { textContent: message.content, artifactHtml: null };
+    }
+
+    // 1. Check for fenced ```html <!DOCTYPE ...> ```
+    const fencedMatch = message.content.match(/```(?:html)?\s*(<!DOCTYPE html[\s\S]+?|<html>[\s\S]+?)```/i);
+    if (fencedMatch) {
+      const artifact = fencedMatch[1].trim();
+      const cleanText = message.content.replace(fencedMatch[0], '').trim();
+      return { textContent: cleanText, artifactHtml: artifact };
+    }
+
+    // 2. Check for standalone <!DOCTYPE html> ... </html>
+    const rawDocMatch = message.content.match(/(<!DOCTYPE html[\s\S]+?<\/html>)/i);
+    if (rawDocMatch) {
+      const artifact = rawDocMatch[1].trim();
+      const cleanText = message.content.replace(rawDocMatch[0], '').trim();
+      return { textContent: cleanText, artifactHtml: artifact };
+    }
+
+    return { textContent: message.content, artifactHtml: null };
+  }, [message.content, isUser]);
 
   return (
     <div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
@@ -25,16 +51,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
         </div>
 
         {/* Message Content Body */}
-        <div className="flex flex-col space-y-2">
-          <div
-            className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
-              isUser
-                ? 'bg-slate-900 text-white rounded-tr-sm shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'
-            }`}
-          >
-            {message.content}
-          </div>
+        <div className="flex flex-col space-y-2 flex-1 min-w-0">
+          {textContent && (
+            <div
+              className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                isUser
+                  ? 'bg-slate-900 text-white rounded-tr-sm shadow-sm'
+                  : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm shadow-sm'
+              }`}
+            >
+              {textContent}
+            </div>
+          )}
+
+          {/* Secure Interactive Artifact Sandbox */}
+          {artifactHtml && (
+            <SecureArtifactViewer
+              content={artifactHtml}
+              type="html"
+              title="Interactive Growth Artifact"
+            />
+          )}
 
           {/* Source Citations for Assistant Responses */}
           {!isUser && message.sources && message.sources.length > 0 && (
