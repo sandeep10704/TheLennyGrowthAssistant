@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         ) : null}
 
-        {/* Artifact Studio Toggle Button */}
+        {/* Split Screen Artifact Viewer Toggle Button */}
         {onToggleArtifacts && (
           <button
             onClick={onToggleArtifacts}
@@ -105,14 +105,16 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-brand-50 border-brand-200 text-brand-700'
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
-            title={isArtifactsOpen ? 'Close Artifact Panel' : 'Open Artifact Panel'}
+            title={isArtifactsOpen ? 'Hide Artifact (Focus Chat)' : 'Open Split Screen (Chat + Artifact)'}
           >
             {isArtifactsOpen ? (
               <PanelRightClose className="w-4 h-4 text-brand-600" />
             ) : (
               <PanelRightOpen className="w-4 h-4 text-slate-600" />
             )}
-            <span className="hidden sm:inline">Artifact Studio</span>
+            <span className="hidden sm:inline">
+              {isArtifactsOpen ? 'Split Screen Active' : 'Split Screen'}
+            </span>
             {artifactsCount > 0 && (
               <span className="ml-1 px-1.5 py-0.2 bg-brand-500 text-white rounded-full text-[10px] font-bold">
                 {artifactsCount}
