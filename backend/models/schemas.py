@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal, Union
 from pydantic import BaseModel, Field
 
 
@@ -102,3 +102,62 @@ class ErrorResponse(BaseModel):
     detail: Optional[Any] = Field(default=None, description="Detailed explanation or validation details")
     code: str = Field(..., description="Machine-readable error code")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ==============================================================================
+# Agent Router Structured Output Schemas
+# ==============================================================================
+class AnswerData(BaseModel):
+    """Payload for RAG question-answering intent."""
+    query: str
+    content: str
+    sources: List[SourceCitation] = []
+    session_id: Optional[str] = None
+    provider: str
+    model: str
+
+
+class EssayData(BaseModel):
+    """Payload for long-form essay / article generator intent."""
+    title: str
+    subtitle: Optional[str] = None
+    summary: str
+    content: str
+    estimated_read_time_mins: int
+    frameworks_referenced: List[str] = []
+    takeaways: List[str] = []
+    provider: str
+    model: str
+
+
+class ArtifactData(BaseModel):
+    """Payload for page / artifact generator intent."""
+    title: str
+    artifact_type: str = "landing_page"
+    description: str
+    code: str
+    metadata: Dict[str, Any] = {}
+    provider: str
+    model: str
+
+
+class AgentRouterRequest(BaseModel):
+    """Request payload for the agent intent router."""
+    prompt: str = Field(
+        ...,
+        min_length=1,
+        description="Prompt to classify and execute (e.g. question, 'write article ...', or 'create page ...')"
+    )
+    session_id: Optional[str] = Field(default=None, description="Optional conversational session ID")
+    provider: Optional[str] = Field(default=None, description="Optional LLM provider override")
+    model: Optional[str] = Field(default=None, description="Optional model override")
+    temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0)
+
+
+class AgentRouterResponse(BaseModel):
+    """
+    Structured response returned by the Agent Router.
+    Output: { type: "answer" | "essay" | "artifact", data: ... }
+    """
+    type: Literal["answer", "essay", "artifact"]
+    data: Union[AnswerData, EssayData, ArtifactData, Dict[str, Any]]

@@ -7,6 +7,11 @@ from models.schemas import (
     HealthResponse,
     HealthComponentStatus,
     ErrorResponse,
+    AnswerData,
+    EssayData,
+    ArtifactData,
+    AgentRouterRequest,
+    AgentRouterResponse,
 )
 from models.database import (
     Base,
@@ -27,6 +32,11 @@ __all__ = [
     "HealthResponse",
     "HealthComponentStatus",
     "ErrorResponse",
+    "AnswerData",
+    "EssayData",
+    "ArtifactData",
+    "AgentRouterRequest",
+    "AgentRouterResponse",
     "Base",
     "ChatSessionModel",
     "ChatMessageModel",

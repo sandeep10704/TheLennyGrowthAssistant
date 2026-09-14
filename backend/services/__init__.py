@@ -18,6 +18,7 @@ from services.llm_service import (
     generate_response,
 )
 from services.chat_service import ChatService, get_chat_service
+from services.agent_router import AgentRouter, get_agent_router
 
 __all__ = [
     "AppException",
@@ -40,4 +41,6 @@ __all__ = [
     "generate_response",
     "ChatService",
     "get_chat_service",
+    "AgentRouter",
+    "get_agent_router",
 ]
