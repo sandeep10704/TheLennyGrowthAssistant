@@ -50,6 +50,17 @@ class LLMServiceError(AppException):
         )
 
 
+class LLMTimeoutError(LLMServiceError):
+    """Raised when an LLM provider request exceeds the configured timeout."""
+    def __init__(self, provider: str, timeout_seconds: float):
+        super().__init__(
+            provider=provider,
+            reason=f"Request timed out after {timeout_seconds}s.",
+        )
+        self.code = "LLM_TIMEOUT"
+        self.status_code = 504
+
+
 class VectorStoreError(AppException):
     """Raised when Chroma vector store operations encounter a failure."""
     def __init__(self, reason: str):

@@ -83,7 +83,7 @@ class ChatService:
         messages.append({"role": "user", "content": request.message})
 
         # 7. Execute LLM generation
-        result = await self.llm_service.generate_response(
+        result = await self.llm_service.generate_chat_turn(
             messages=messages,
             provider=request.provider,
             model=request.model,

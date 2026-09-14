@@ -68,6 +68,9 @@ class Settings(BaseSettings):
 
     # LLM Providers (Active: "openai" or "ollama")
     LLM_PROVIDER: str = "openai"
+    LLM_TIMEOUT_SECONDS: float = 30.0
+    LLM_FALLBACK_ENABLED: bool = True
+    LLM_FALLBACK_PROVIDER: str = "ollama"
 
     # OpenAI Settings
     OPENAI_API_KEY: str = ""
@@ -78,6 +81,7 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3"
     OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
+    OLLAMA_TIMEOUT_SECONDS: float = 60.0
 
     # Session Management
     MAX_SESSION_HISTORY: int = 20
