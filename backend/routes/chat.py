@@ -29,6 +29,19 @@ async def chat_endpoint(
 
 
 @router.get(
+    "/chat/sessions",
+    summary="List all recent chat sessions",
+    description="Retrieves a list of recent conversation sessions ordered by last active update.",
+)
+async def list_recent_sessions(
+    limit: int = 20,
+    session_service: SessionService = Depends(get_session_service),
+):
+    """List recent conversation sessions."""
+    return await session_service.list_sessions(limit=limit)
+
+
+@router.get(
     "/chat/sessions/{session_id}",
     response_model=SessionDetailResponse,
     summary="Get session details and message history",

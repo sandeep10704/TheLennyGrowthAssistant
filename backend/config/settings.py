@@ -46,6 +46,19 @@ class Settings(BaseSettings):
     # Relational Database (PostgreSQL / Supabase compatible)
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/lenny_growth"
 
+    # Database Connection Pooling Configuration (Optimized for Supabase / PostgreSQL)
+    DB_POOL_SIZE: int = 15
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800  # 30 minutes recycle to prevent dropped idle sockets
+    DB_POOL_PRE_PING: bool = True
+    DB_STATEMENT_CACHE_SIZE: int = 0  # Set to 0 when using Supabase/PgBouncer transaction pooler (port 6543)
+
+    # Database Transient Retry Policy
+    DB_MAX_RETRIES: int = 3
+    DB_RETRY_BASE_DELAY: float = 0.5
+    DB_RETRY_MAX_DELAY: float = 3.0
+
     # Vector Database (Chroma)
     CHROMA_HOST: str = "localhost"
     CHROMA_PORT: int = 8001
