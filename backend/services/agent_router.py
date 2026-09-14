@@ -13,6 +13,7 @@ from models.schemas import (
 from services.vector_service import VectorService, get_vector_service
 from services.session_service import SessionService, get_session_service
 from services.llm_service import LLMService, get_llm_service
+from services.essay_generator import generate_ship30_article, Ship30Article
 
 IntentType = Literal["answer", "essay", "artifact"]
 
@@ -193,73 +194,21 @@ class AgentRouter:
         sources = self.vector_service.query_knowledge(query=topic, top_k=5)
         context_str = "\n\n".join(s.content for s in sources) if sources else "Standard high-growth frameworks."
 
-        essay_system_prompt = f"""You are an elite contributing writer for Lenny's Newsletter.
-Write a definitive, deeply practical, and compelling long-form growth essay on: '{topic}'.
-
-Format your output in Markdown with the following structured sections:
-# [Catchy, Authoritative Title]
-## [Engaging Subtitle]
-
-**Executive Brief:** (2-3 concise summary sentences)
-
----
-
-### 1. The Paradox & The Core Problem
-(Why do so many smart product teams get this wrong? Establish high stakes.)
-
-### 2. Foundational Mental Models & Frameworks
-(Explain the core heuristics, citing benchmarks like the 40% PMF test, retention curves, or growth loops.)
-
-### 3. Case Studies & Benchmarks
-(Concrete examples: Airbnb, Dropbox, Slack, Figma, Stripe, DoorDash.)
-
-### 4. The Tactical Playbook: What to Do on Monday
-(Step-by-step actionable recommendations.)
-
-### 5. Summary Takeaways
-- Key takeaway 1
-- Key takeaway 2
-- Key takeaway 3
-
-GROUNDING KNOWLEDGE:
-{context_str}
-"""
-
-        essay_content = await self.llm_service.generate_response(
-            query=f"Write the complete, comprehensive essay on: {topic}",
+        # Generate article using Ship 30 framework (outline -> expand -> format)
+        article: Ship30Article = await generate_ship30_article(
             context=context_str,
-            provider=provider,
-            model=model,
-            temperature=temperature,
-            system_template=essay_system_prompt,
+            topic=topic,
+            llm_service=self.llm_service,
         )
 
-        # Extract title and subtitle from generated markdown
-        title = f"The Definitive Guide to {topic.title()}"
-        subtitle = "Heuristics, benchmarks, and tactical playbooks from high-growth companies."
-
-        title_match = re.search(r"^#\s+(.+)$", essay_content, re.MULTILINE)
-        if title_match:
-            title = title_match.group(1).strip()
-
-        subtitle_match = re.search(r"^##\s+(.+)$", essay_content, re.MULTILINE)
-        if subtitle_match:
-            subtitle = subtitle_match.group(1).strip()
-
-        # Extract takeaways
-        takeaways = []
-        takeaway_matches = re.findall(r"-\s+([^\n]+)", essay_content)
-        if takeaway_matches:
-            takeaways = takeaway_matches[-4:]
-
         return EssayData(
-            title=title,
-            subtitle=subtitle,
-            summary=f"A comprehensive deep-dive into {topic}, synthesized from growth heuristics and real-world playbooks.",
-            content=essay_content,
-            estimated_read_time_mins=max(3, len(essay_content.split()) // 200),
+            title=article.title,
+            subtitle=article.subtitle,
+            summary=f"A ~{article.word_count}-word Ship 30 essay on {topic}, synthesized from growth frameworks.",
+            content=article.content,
+            estimated_read_time_mins=max(3, article.word_count // 200),
             frameworks_referenced=["Retention Curves", "Sean Ellis PMF Benchmark", "Growth Loops", "Aha! Moments"],
-            takeaways=takeaways,
+            takeaways=article.takeaways,
             provider=provider or "openai",
             model=model or "gpt-4o",
         )
